@@ -163,23 +163,6 @@ static const struct xpad_device {
 	{ 0x044f, 0xd01e, "ThrustMaster, Inc. ESWAP X 2 ELDEN RING EDITION", 0, XTYPE_XBOXONE },
 	{ 0x044f, 0x0f10, "Thrustmaster Modena GT Wheel", 0, XTYPE_XBOX },
 	{ 0x044f, 0xb326, "Thrustmaster Gamepad GP XID", 0, XTYPE_XBOX360 },
-	{ 0x045e, 0x0202, "Microsoft X-Box pad v1 (US)", 0, XTYPE_XBOX },
-	{ 0x045e, 0x0285, "Microsoft X-Box pad (Japan)", 0, XTYPE_XBOX },
-	{ 0x045e, 0x0287, "Microsoft Xbox Controller S", 0, XTYPE_XBOX },
-	{ 0x045e, 0x0288, "Microsoft Xbox Controller S v2", 0, XTYPE_XBOX },
-	{ 0x045e, 0x0289, "Microsoft X-Box pad v2 (US)", 0, XTYPE_XBOX },
-	{ 0x045e, 0x028e, "Microsoft X-Box 360 pad", 0, XTYPE_XBOX360 },
-	{ 0x045e, 0x028f, "Microsoft X-Box 360 pad v2", 0, XTYPE_XBOX360 },
-	{ 0x045e, 0x0291, "Xbox 360 Wireless Receiver (XBOX)", MAP_DPAD_TO_BUTTONS, XTYPE_XBOX360W },
-	{ 0x045e, 0x02a9, "Xbox 360 Wireless Receiver (Unofficial)", MAP_DPAD_TO_BUTTONS, XTYPE_XBOX360W },
-	{ 0x045e, 0x02d1, "Microsoft X-Box One pad", 0, XTYPE_XBOXONE },
-	{ 0x045e, 0x02dd, "Microsoft X-Box One pad (Firmware 2015)", 0, XTYPE_XBOXONE },
-	{ 0x045e, 0x02e3, "Microsoft X-Box One Elite pad", MAP_PADDLES, XTYPE_XBOXONE },
-	{ 0x045e, 0x02ea, "Microsoft X-Box One S pad", 0, XTYPE_XBOXONE },
-	{ 0x045e, 0x0719, "Xbox 360 Wireless Receiver", MAP_DPAD_TO_BUTTONS, XTYPE_XBOX360W },
-	{ 0x045e, 0x0b00, "Microsoft X-Box One Elite 2 pad", MAP_PADDLES, XTYPE_XBOXONE },
-	{ 0x045e, 0x0b0a, "Microsoft X-Box Adaptive Controller", MAP_PROFILE_BUTTON, XTYPE_XBOXONE },
-	{ 0x045e, 0x0b12, "Microsoft Xbox Series S|X Controller", MAP_SELECT_BUTTON, XTYPE_XBOXONE },
 	{ 0x046d, 0xc21d, "Logitech Gamepad F310", 0, XTYPE_XBOX360 },
 	{ 0x046d, 0xc21e, "Logitech Gamepad F510", 0, XTYPE_XBOX360 },
 	{ 0x046d, 0xc21f, "Logitech Gamepad F710", 0, XTYPE_XBOX360 },
@@ -529,8 +512,6 @@ static const struct usb_device_id xpad_table[] = {
 	XPAD_XBOXONE_VENDOR(0x03f0),		/* HP HyperX Xbox One controllers */
 	XPAD_XBOX360_VENDOR(0x044f),		/* Thrustmaster Xbox 360 controllers */
 	XPAD_XBOXONE_VENDOR(0x044f),		/* Thrustmaster Xbox One controllers */
-	XPAD_XBOX360_VENDOR(0x045e),		/* Microsoft Xbox 360 controllers */
-	XPAD_XBOXONE_VENDOR(0x045e),		/* Microsoft Xbox One controllers */
 	XPAD_XBOX360_VENDOR(0x046d),		/* Logitech Xbox 360-style controllers */
 	XPAD_XBOX360_VENDOR(0x056e),		/* Elecom JC-U3613M */
 	XPAD_XBOX360_VENDOR(0x06a3),		/* Saitek P3600 */
@@ -737,9 +718,6 @@ static const struct xboxone_init_packet xboxone_init_packets[] = {
 	XBOXONE_INIT_PKT(0x0f0d, 0x0067, xboxone_hori_ack_id),
 	XBOXONE_INIT_PKT(0x1430, 0x079b, xboxone_hori_ack_id),
 	XBOXONE_INIT_PKT(0x0000, 0x0000, xboxone_power_on),
-	XBOXONE_INIT_PKT(0x045e, 0x02ea, xboxone_s_init),
-	XBOXONE_INIT_PKT(0x045e, 0x0b00, xboxone_s_init),
-	XBOXONE_INIT_PKT(0x045e, 0x0b00, extra_input_packet_init),
 	XBOXONE_INIT_PKT(0x0e6f, 0x0000, xboxone_pdp_led_on),
 	XBOXONE_INIT_PKT(0x1430, 0x079b, xboxone_pdp_led_on),
 	XBOXONE_INIT_PKT(0x20d6, 0xa01a, xboxone_pdp_led_on),
@@ -2415,36 +2393,9 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	usb_set_intfdata(intf, xpad);
 
 	/* Packet type detection */
-	if (le16_to_cpu(udev->descriptor.idVendor) == 0x045e) { /* Microsoft controllers */
-		if (le16_to_cpu(udev->descriptor.idProduct) == 0x02e3) {
-			/* The original elite controller always uses the oldest
-			 * type of extended packet
-			 */
-			xpad->packet_type = PKT_XBE1;
-		} else if (le16_to_cpu(udev->descriptor.idProduct) == 0x0b00) {
-			/* The elite 2 controller has seen multiple packet
-			 * revisions. These are tied to specific firmware
-			 * versions
-			 */
-			if (le16_to_cpu(udev->descriptor.bcdDevice) < 0x0500) {
-				/* This is the format that the Elite 2 used
-				 * prior to the BLE update
-				 */
-				xpad->packet_type = PKT_XBE2_FW_OLD;
-			} else if (le16_to_cpu(udev->descriptor.bcdDevice) <
-				   0x050b) {
-				/* This is the format that the Elite 2 used
-				 * prior to the update that split the packet
-				 */
-				xpad->packet_type = PKT_XBE2_FW_5_EARLY;
-			} else {
-				/* The split packet format that was introduced
-				 * in firmware v5.11
-				 */
-				xpad->packet_type = PKT_XBE2_FW_5_11;
-			}
-		}
-	}
+	/* Skip Microsoft controllers to allow xone to handle them */
+	if (le16_to_cpu(udev->descriptor.idVendor) == 0x045e)
+		return -ENODEV;
 
 	if (xpad->xtype == XTYPE_XBOX360W) {
 		/*
